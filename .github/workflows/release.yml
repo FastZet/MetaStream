@@ -1,0 +1,42 @@
+name: Build and Release MetaStream
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Build Binaries
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [linux, windows]
+        goarch: [amd64]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+      
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          if [ "$GOOS" = "windows" ]; then
+            go build -ldflags="-s -w" -o MetaStream-${{ matrix.goos }}-${{ matrix.goarch }}.exe
+          else
+            go build -ldflags="-s -w" -o MetaStream-${{ matrix.goos }}-${{ matrix.goarch }}
+          fi
+      
+      - name: Upload binaries to release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: MetaStream-*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
