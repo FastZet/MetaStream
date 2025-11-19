@@ -1,7 +1,7 @@
 package scrapers
 
 import (
-	"github.com/YOUR_USERNAME/MetaStream/models"
+	"github.com/fastzet/MetaStream/models"
 )
 
 // Scraper interface that all website scrapers must implement
