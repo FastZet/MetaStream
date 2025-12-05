@@ -10,8 +10,7 @@ from app.core.logger import setup_logging, get_logger
 from app.core.engine import engine
 
 # --- Scraper Imports ---
-# We will uncomment this when we create the first scraper
-# from app.scrapers.site_x import SiteXScraper
+from app.scrapers.dinotube import DinoTubeScraper
 
 # Setup Logging
 setup_logging()
@@ -42,7 +41,7 @@ async def startup_event():
     logger.info("Starting MetaStream Engine...")
     
     # --- Register Scrapers Here ---
-    # engine.register_scraper(SiteXScraper())
+    engine.register_scraper(DinoTubeScraper())
     
     logger.info("Engine initialized and ready.")
 
