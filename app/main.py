@@ -1,6 +1,6 @@
 import random
 from fastapi import FastAPI, Request, Response, Cookie
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from typing import Optional
@@ -19,8 +19,7 @@ logger = get_logger("main")
 # Initialize App
 app = FastAPI(title=settings.PROJECT_NAME, version=settings.VERSION)
 
-# Mount Static Files (CSS/Images)
-# Ensure the folder 'app/static' exists
+# Mount Static Files
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 # Setup Templates
@@ -39,20 +38,17 @@ async def startup_event():
     Register scrapers on startup.
     """
     logger.info("Starting MetaStream Engine...")
-    
-    # --- Register Scrapers Here ---
     engine.register_scraper(DinoTubeScraper())
-    
     logger.info("Engine initialized and ready.")
+
+# --- NEW: Health Check for Render ---
+@app.get("/healthz")
+@app.head("/")
+async def health_check():
+    return JSONResponse(content={"status": "ok"}, status_code=200)
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request, over_18: Optional[str] = Cookie(None)):
-    """
-    Root route. 
-    Checks for 'over_18' cookie.
-    If missing -> Show Splash Screen.
-    If present -> Show Home Page.
-    """
     if not over_18:
         logger.info("New user detected. Showing splash screen.")
         return templates.TemplateResponse("splash.html", {"request": request})
@@ -64,25 +60,16 @@ async def read_root(request: Request, over_18: Optional[str] = Cookie(None)):
 
 @app.post("/enter")
 async def enter_site():
-    """
-    Sets the age verification cookie and redirects to home.
-    """
     response = RedirectResponse(url="/", status_code=303)
-    # Cookie lasts 30 days
     response.set_cookie(key="over_18", value="true", max_age=60*60*24*30) 
     logger.info("User verified age. Setting cookie.")
     return response
 
 @app.get("/search", response_class=HTMLResponse)
 async def search(request: Request, q: str, page: int = 1):
-    """
-    Search route used by HTMX.
-    Returns the 'results.html' partial fragment, not a full page.
-    """
     if not q:
         return HTMLResponse("", status_code=200)
 
-    # Execute search via the Engine
     data = await engine.search(q, page)
     
     return templates.TemplateResponse("results.html", {
