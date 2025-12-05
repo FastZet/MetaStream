@@ -9,8 +9,6 @@ class DinoTubeScraper(BaseScraper):
         super().__init__(name="DinoTube", base_url="https://www.dinotube.com")
 
     async def search(self, query: str, page: int = 1) -> List[VideoResult]:
-        # DinoTube search URL format: /search/{query}?page={page}
-        # Note: They use hyphens for spaces usually, but URL encoding works too.
         formatted_query = query.replace(" ", "+")
         if page > 1:
             url = f"{self.base_url}/search/{formatted_query}?page={page}"
@@ -22,73 +20,59 @@ class DinoTubeScraper(BaseScraper):
             return []
 
         results = []
-        
-        # The container for results
         container = soup.select_one(".cards-container")
         if not container:
-            self.logger.warning(f"No card container found for query: {query}")
             return []
 
-        # Find all individual video cards
         cards = container.select(".card")
         
         for card in cards:
             try:
-                # 1. Title and URL
                 link_tag = card.select_one("a.item-link")
                 if not link_tag:
                     continue
                 
                 title = link_tag.get("title", "Unknown Title")
                 href = link_tag.get("href", "")
-                
-                # Handle relative URLs
                 if href.startswith("/"):
                     video_url = f"{self.base_url}{href}"
                 else:
                     video_url = href
 
-                # 2. Thumbnail
                 img_tag = card.select_one("img.item-image")
                 thumbnail = "https://via.placeholder.com/320x180?text=No+Image"
                 if img_tag:
                     thumbnail = img_tag.get("src") or img_tag.get("data-src") or thumbnail
 
-                # 3. Duration
-                # The badge might contain "HD" or "4K" text as well, so we clean it.
-                duration_tag = card.select_one(".badge.float-right")
+                # --- NEW LOGIC FOR DURATION & QUALITY ---
                 duration = "N/A"
-                if duration_tag:
-                    # Get text, strip whitespace
-                    raw_text = duration_tag.get_text(separator=" ", strip=True)
-                    # Simple cleanup: remove "HD" or "4K" if present to just get time
-                    clean_text = raw_text.replace("HD", "").replace("4K", "").replace("VR", "").strip()
-                    if clean_text:
-                        duration = clean_text
+                quality = None
+                
+                badge_tag = card.select_one(".badge.float-right")
+                if badge_tag:
+                    # Check for nested span (usually holds the 'HD' or '4K' text)
+                    quality_span = badge_tag.select_one("span")
+                    if quality_span:
+                        quality = quality_span.get_text(strip=True)
+                        # Remove the quality text from the full text to get just duration
+                        # badge text: "4K 26:48" -> "26:48"
+                        full_text = badge_tag.get_text(separator=" ", strip=True)
+                        duration = full_text.replace(quality, "").strip()
+                    else:
+                        duration = badge_tag.get_text(strip=True)
 
-                # 4. Rating
-                rating_tag = card.select_one(".item-score")
+                # --- NEW LOGIC FOR RATING ---
                 rating = "N/A"
+                rating_tag = card.select_one(".item-score")
                 if rating_tag:
-                    rating = rating_tag.get_text(strip=True)
+                    raw_rating = rating_tag.get_text(strip=True)
+                    # Remove % sign so we just store the number (e.g. "54")
+                    rating = raw_rating.replace("%", "")
 
-                # 5. Source (The site hosting the video, e.g., Eporner)
-                # It's usually in the footer area
-                source_tag = card.select_one(".item-source")
+                source_link = card.select_one("a.item-source")
                 video_source = "DinoTube"
-                if source_tag:
-                    text = source_tag.get_text(strip=True)
-                    # Sometimes text implies date "4 days ago", we want the one that isn't a date
-                    # But usually the site name is the anchor tag inside .item-source-rating-container
-                    # Let's try to be specific:
-                    source_link = card.select_one("a.item-source")
-                    if source_link:
-                        video_source = source_link.get_text(strip=True)
-
-                # 6. Views
-                # DinoTube search cards don't explicitly show view counts in the provided HTML.
-                # We will leave it as N/A or try to parse if we find it later.
-                views = "N/A"
+                if source_link:
+                    video_source = source_link.get_text(strip=True)
 
                 video = VideoResult(
                     title=title,
@@ -96,8 +80,9 @@ class DinoTubeScraper(BaseScraper):
                     thumbnail=thumbnail,
                     duration=duration,
                     rating=rating,
+                    quality=quality, # Pass the quality
                     source=video_source,
-                    views=views
+                    views="N/A" # DinoTube search doesn't show views
                 )
                 results.append(video)
 
@@ -105,5 +90,4 @@ class DinoTubeScraper(BaseScraper):
                 self.logger.error(f"Error parsing card: {e}")
                 continue
 
-        self.logger.info(f"Parsed {len(results)} videos from DinoTube")
         return results
