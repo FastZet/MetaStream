@@ -2,14 +2,20 @@ import logging
 import sys
 from app.core.config import settings
 
+class EndpointFilter(logging.Filter):
+    """
+    Filter to exclude specific endpoints from logs (e.g., health checks).
+    """
+    def filter(self, record: logging.LogRecord) -> bool:
+        return record.getMessage().find("/healthz") == -1
+
 def setup_logging():
     """
     Configures the root logger based on settings.
-    Ensures logs are output to stdout for Docker capture.
     """
     log_level = getattr(logging, settings.LOG_LEVEL.upper(), logging.DEBUG)
     
-    # Create a handler that writes to stdout (standard output)
+    # Create a handler that writes to stdout
     handler = logging.StreamHandler(sys.stdout)
     handler.setLevel(log_level)
     
@@ -21,20 +27,21 @@ def setup_logging():
     root_logger = logging.getLogger()
     root_logger.setLevel(log_level)
     
-    # Remove existing handlers to avoid duplicates if re-initialized
+    # Clean up existing handlers
     if root_logger.handlers:
         root_logger.handlers = []
         
     root_logger.addHandler(handler)
     
-    # Explicitly set levels for third-party libraries to match our verbosity
+    # Set levels for libraries
     logging.getLogger("uvicorn").setLevel(log_level)
     logging.getLogger("httpx").setLevel(log_level)
     logging.getLogger("fastapi").setLevel(log_level)
 
+    # --- SUPPRESS HEALTH LOGS ---
+    # Get the uvicorn access logger and add the filter
+    uvicorn_access_logger = logging.getLogger("uvicorn.access")
+    uvicorn_access_logger.addFilter(EndpointFilter())
+
 def get_logger(name: str) -> logging.Logger:
-    """
-    Utility to get a logger with a specific name.
-    Usage: logger = get_logger(__name__)
-    """
     return logging.getLogger(name)
