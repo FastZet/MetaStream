@@ -1,11 +1,32 @@
 {% if results %}
-    <div class="flex justify-between items-center mb-6 px-2">
+    <!-- Metadata Header & Top Pagination -->
+    <div class="flex flex-col md:flex-row justify-between items-center mb-6 px-2 gap-4">
         <h2 class="text-gray-400 text-sm">
             Found <span class="text-white font-bold">{{ count }}</span> results in <span class="text-white font-bold">{{ time }}s</span>
         </h2>
-        <span class="text-xs text-gray-600 bg-gray-900 px-2 py-1 rounded">Page {{ page }}</span>
+        
+        <!-- Top Pagination (Compact) -->
+        <div class="flex gap-2">
+            {% if page > 1 %}
+            <button hx-get="/search?q={{ query }}&page={{ page - 1 }}"
+                    hx-target="#search-results"
+                    hx-swap="innerHTML show:top"
+                    class="px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded text-xs">
+                Prev
+            </button>
+            {% endif %}
+            <span class="px-3 py-1 bg-gray-900 text-red-500 rounded text-xs font-bold">{{ page }}</span>
+            <button hx-get="/search?q={{ query }}&page={{ page + 1 }}"
+                    hx-target="#search-results"
+                    hx-swap="innerHTML show:top"
+                    hx-indicator="#loading"
+                    class="px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded text-xs">
+                Next
+            </button>
+        </div>
     </div>
 
+    <!-- The Grid -->
     <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-12">
         {% for video in results %}
         <a href="{{ video.url }}" target="_blank" rel="noopener noreferrer" class="group block bg-gray-900 rounded-lg overflow-hidden hover:ring-2 hover:ring-red-600 transition-all duration-200 shadow-lg">
@@ -13,7 +34,6 @@
             <div class="relative aspect-video bg-gray-800 overflow-hidden">
                 <img src="{{ video.thumbnail }}" alt="{{ video.title }}" loading="lazy" class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-300">
                 
-                <!-- Duration & Quality Badge -->
                 {% if video.duration != 'N/A' %}
                 <div class="absolute bottom-1 right-1 bg-black bg-opacity-80 text-white text-[10px] font-bold px-1.5 py-0.5 rounded flex gap-1">
                     {% if video.quality %}
@@ -34,19 +54,17 @@
                 </h3>
                 
                 <div class="flex justify-between items-center text-[10px] sm:text-xs text-gray-500">
-                    <!-- Views: Only show if valid -->
                     {% if video.views != 'N/A' and video.views != '0' %}
-                    <span class="flex items-center gap-1" title="Views">
+                    <span class="flex items-center gap-1">
                         <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/></svg>
                         {{ video.views }}
                     </span>
                     {% else %}
-                    <span></span> <!-- Spacer -->
+                    <span></span>
                     {% endif %}
 
-                    <!-- Rating: Re-add % here since we stripped it in python -->
                     {% if video.rating != 'N/A' %}
-                    <span class="flex items-center gap-1 text-green-400" title="Rating">
+                    <span class="flex items-center gap-1 text-green-400">
                         {{ video.rating }}%
                     </span>
                     {% endif %}
@@ -56,33 +74,48 @@
         {% endfor %}
     </div>
 
-    <div class="flex justify-center gap-4 py-8 border-t border-gray-800">
+    <!-- Bottom Pagination (Detailed) -->
+    <div class="flex justify-center items-center gap-2 py-8 border-t border-gray-800 flex-wrap">
+        <!-- Previous Button -->
         {% if page > 1 %}
         <button hx-get="/search?q={{ query }}&page={{ page - 1 }}"
                 hx-target="#search-results"
                 hx-swap="innerHTML show:top"
-                hx-indicator="#loading"
-                class="px-6 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-full font-medium transition-colors text-sm">
-            &larr; Previous
+                class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded transition-colors text-sm">
+            &larr; Prev
         </button>
         {% endif %}
+
+        <!-- Numbered Pages Logic (Simple window: Page-2 to Page+2) -->
+        {% set start = page - 2 if page - 2 > 0 else 1 %}
+        {% set end = page + 3 %}
         
+        {% for p in range(start, end) %}
+            {% if p == page %}
+                <span class="px-4 py-2 bg-red-600 text-white rounded font-bold text-sm">{{ p }}</span>
+            {% else %}
+                <button hx-get="/search?q={{ query }}&page={{ p }}"
+                        hx-target="#search-results"
+                        hx-swap="innerHTML show:top"
+                        hx-indicator="#loading"
+                        class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded transition-colors text-sm">
+                    {{ p }}
+                </button>
+            {% endif %}
+        {% endfor %}
+
+        <!-- Next Button -->
         <button hx-get="/search?q={{ query }}&page={{ page + 1 }}"
                 hx-target="#search-results"
                 hx-swap="innerHTML show:top"
                 hx-indicator="#loading"
-                class="px-6 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-full font-medium transition-colors text-sm">
+                class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded transition-colors text-sm">
             Next &rarr;
         </button>
     </div>
 
 {% else %}
     <div class="text-center py-20 bg-gray-900/50 rounded-lg border border-gray-800">
-        <div class="inline-block p-4 bg-gray-800 rounded-full mb-4">
-            <svg class="w-12 h-12 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-        </div>
         <h3 class="text-xl text-gray-400 font-medium">No results found</h3>
         <p class="text-gray-600 mt-2 text-sm">Try using simpler keywords.</p>
     </div>
