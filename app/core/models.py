@@ -15,6 +15,7 @@ class VideoResult(BaseModel):
     duration: Optional[str] = "N/A"
     views: Optional[str] = "N/A"
     rating: Optional[str] = "N/A"
+    quality: Optional[str] = None
     uploader: Optional[str] = None
     tags: List[str] = Field(default_factory=list)
     
